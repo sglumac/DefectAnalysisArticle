@@ -1,0 +1,14 @@
+*.idb
+*.pdb
+*.dll
+.vs
+*.obj
+*.exe
+*.ilk
+Debug
+Release
+.vscode
+*.csv
+build
+install
+out
