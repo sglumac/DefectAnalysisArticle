@@ -10,3 +10,5 @@ cmake --build . --target install
 cd ..
 
 python scripts\results_analysis.py
+
+echo "Figures produced to the .\out folder..."
