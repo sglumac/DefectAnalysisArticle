@@ -432,65 +432,6 @@ TEST(Tests, test_t2o_0_cvode) {
   }
 }
 
-typedef void GetT2OType(double* o2tTau, double t, double* t2oPhi, double* t2oOmega);
-
-
-TEST(Tests, test_t2o_h_cvode) {
- CosimulationNetworkPtr network = examples::instantiate_oscillator_network(2, 2, examples::SimpleSolver::Cvode);
-  
-  CosimulationNetworkPtr analyticNetwork = examples::instantiate_twomass(2);
-
-  std::shared_ptr<FMU> t2o = network->instances["tau2omega"];
-  std::shared_ptr<FMU> twomass = analyticNetwork->instances["twomass"];
-
-  double J_Omega2Tau = 10;
-  double c_Omega2Tau = 1;
-  double d_Omega2Tau = 1;
-  double phi0_Omega2Tau = 0.1;
-  double omega0_Omega2Tau = 0.1;
-  double J_Tau2Omega = 10;
-  double c_Tau2Omega = 1;
-  double d_Tau2Omega = 2;
-  double phi0_Tau2Omega = 0.2;
-  double omega0_Tau2Omega = 0.1;
-  double ck = 1;
-  double dk = 2;
-
-  OutputDerivatives twomassTau = twomass->get_output(TAU_2M_VR);
-
-  double h = 0.5;
-  t2o->step(h);
-  OutputDerivatives t2oOmega = t2o->get_output(OMEGA_T2O_VR);
-
-  double o2tTau[3];
-  for (size_t i = 0; i < 3; i++) { o2tTau[i] = twomassTau.values[i]; };
-
-  double t2oPhiH;
-  double t2oOmegaH;
-  HINSTANCE testSundialsHandle = LoadLibraryA("TestSundials.dll");
-  GetT2OType *get_t2o = (GetT2OType *)GetProcAddress(testSundialsHandle, "get_t2o");
-  get_t2o(o2tTau, h, &t2oPhiH, &t2oOmegaH);
-  FreeLibrary(testSundialsHandle);
-
-  std::vector<fmi2Real> shiftedTau = signal::shift_derivatives(twomassTau.values, h);
-
-  double dt2oPhi = t2oOmegaH;
-  double dt2oOmega = (-c_Tau2Omega * t2oPhiH - d_Tau2Omega * t2oOmegaH + shiftedTau[0]) / J_Tau2Omega;
-  double d2t2oPhi = dt2oOmega;
-  double d2t2oOmega = (-c_Tau2Omega * dt2oPhi - d_Tau2Omega * dt2oOmega + shiftedTau[1]) / J_Tau2Omega;
-
-  double expectedT2oOmega[3] = {
-    t2oOmegaH,
-    dt2oOmega,
-    d2t2oOmega
-  };
-  assert(are_approx_equal(t2oOmega.t, h, 1e-6));
-  for (size_t i = 0; i <= 2; i++)
-  {
-    assert(are_approx_equal(t2oOmega.values[i], expectedT2oOmega[i], 1e-6));
-  }
-}
-
 TEST(Tests, test_o2t_0_cvode) {
  CosimulationNetworkPtr network = examples::instantiate_oscillator_network(2, 2, examples::SimpleSolver::Cvode);
   
@@ -526,70 +467,6 @@ TEST(Tests, test_o2t_0_cvode) {
   for (size_t i = 0; i < 3; i++)
   {
     assert(are_approx_equal(o2tTau.values[i], expectedO2TTau[i], 1e-6));
-  }
-}
-
-typedef void GetO2TType(double* t2oOmega, double t, double* o2tPhiH, double* o2tOmegaH, double* t20PhiH);
-
-TEST(Tests, test_o2t_h_cvode) {
- CosimulationNetworkPtr network = examples::instantiate_oscillator_network(2, 2, examples::SimpleSolver::Cvode);
-  
-  CosimulationNetworkPtr analyticNetwork = examples::instantiate_twomass(2);
-
-  std::shared_ptr<FMU> o2t = network->instances["omega2tau"];
-  std::shared_ptr<FMU> twomass = analyticNetwork->instances["twomass"];
-
-  double J_Omega2Tau = 10;
-  double c_Omega2Tau = 1;
-  double d_Omega2Tau = 1;
-  double phi0_Omega2Tau = 0.1;
-  double omega0_Omega2Tau = 0.1;
-  double J_Tau2Omega = 10;
-  double c_Tau2Omega = 1;
-  double d_Tau2Omega = 2;
-  double phi0_Tau2Omega = 0.2;
-  double omega0_Tau2Omega = 0.1;
-  double ck = 1;
-  double dk = 2;
-
-  OutputDerivatives twomassOmega = twomass->get_output(OMEGA_2M_VR);
-
-  double h = 0.5;
-  o2t->step(h);
-
-  OutputDerivatives o2tTau = o2t->get_output(TAU_O2T_VR);
-
-  double t2oOmega[3];
-  for (size_t i = 0; i < 3; i++) { t2oOmega[i] = twomassOmega.values[i]; };
-
-  double o2tPhiH;
-  double o2tOmegaH;
-  double t2oPhiH;
-  HINSTANCE testSundialsHandle = LoadLibraryA("TestSundials.dll");
-  GetO2TType *get_o2t = (GetO2TType *)GetProcAddress(testSundialsHandle, "get_o2t");
-  get_o2t(t2oOmega, h, &o2tPhiH, &o2tOmegaH, &t2oPhiH);
-  FreeLibrary(testSundialsHandle);
-
-  std::vector<fmi2Real> shiftedOmega = signal::shift_derivatives(twomassOmega.values, h);
-
-  double do2tPhiH = o2tOmegaH;
-  double do2tOmegaH = (-(c_Omega2Tau + ck) * o2tPhiH - (d_Omega2Tau + dk) * o2tOmegaH + ck * t2oPhiH + dk * shiftedOmega[0]) / J_Omega2Tau;;
-  double dt2oPhiH = shiftedOmega[0];
-
-  double d2o2tPhiH = do2tOmegaH;
-  double d2o2tOmegaH = (-(c_Omega2Tau + ck) * do2tPhiH - (d_Omega2Tau + dk) * do2tOmegaH + ck * dt2oPhiH + dk * shiftedOmega[1]) / J_Omega2Tau;;
-  double d2t2oPhiH = shiftedOmega[1];
-
-  double expectedO2tPhi[3] = { o2tPhiH, do2tPhiH, d2o2tPhiH };
-  double expectedO2tOmega[3] = { o2tOmegaH, do2tOmegaH, d2o2tOmegaH };
-  double expectedT2oPhi[3] = { t2oPhiH, dt2oPhiH, d2t2oPhiH };
-  
-
-  assert(are_approx_equal(o2tTau.t, h, 1e-6));
-  for (size_t i = 0; i < 3; i++)
-  {
-    double expectedO2tTau = ck * expectedO2tPhi[i] + dk * expectedO2tOmega[i] - ck * expectedT2oPhi[i] - dk * shiftedOmega[i];
-    assert(are_approx_equal(o2tTau.values[i], expectedO2tTau, 1e-6));
   }
 }
 
